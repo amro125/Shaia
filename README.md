@@ -7,6 +7,7 @@ MINI SHIMON. This is a repo for all the code for Shaia: a xylophone and drumming
 One-time set up: Create the virtual environment (one-time setup)
 ```bash
 python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
