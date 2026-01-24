@@ -8,7 +8,7 @@ def infer_bpm_from_positions(
     x,                      # position array
     t,                      # time array
     position_eps=10.0,      # ticks; below this = noise
-    min_nods=3,             # nods needed before BPM estimate
+    min_nods=1,             # nods needed before BPM estimate
     bpm_change_ratio=0.2    # 20% change triggers new segment
 ):
     """
@@ -82,9 +82,7 @@ with open(save_path, "r") as f:
 # Extract head tilt position
 x = np.array([frame[motor_id] for frame in recorded_frames], dtype=float) # position array
 t = np.array([f["t"] for f in recorded_frames])
-print(t)
 t = t - t[0]   # normalize to start at 0
-print(t)
 
 bpm_times, bpm_values = infer_bpm_from_positions(x, t)
 print(f"Detected the following BPMs from the corresponding seconds:\n{bpm_values}\n{bpm_times}")

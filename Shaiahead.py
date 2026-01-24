@@ -21,26 +21,19 @@ HeadTurn = dynamixel(10,porthandle,packethandle,BAUD = 57600)
 HeadTilt = dynamixel(11,porthandle,packethandle,BAUD = 57600)
 Mouth    = dynamixel(12,porthandle,packethandle,BAUD = 57600)
 NeckTilt = dynamixel(13,porthandle,packethandle,BAUD = 57600)
-headMotors = [HeadTurn, HeadTilt, Mouth]
-neckMotors = [NeckTilt]
-motors = headMotors + neckMotors
+NeckTurn = dynamixel(14,porthandle,packethandle,BAUD = 57600)
+# motors to disable torque during recording (they don't need to hold against gravity)
+nonGravityMotors = [HeadTurn, HeadTilt, Mouth, NeckTurn]
+# motors to switch to current-based position mode during recording for holding with current
+gravityMotors = [NeckTilt]
+motors = nonGravityMotors + gravityMotors
 
 
 # HeadTurn 100-260
 # Headtilt 3) 64-140
 # Mouth 2) 320-341
 # Neck tilt 156-210
-
-def moveNeckTilt(unused_addr, *args):
-    min = 156
-    max = 210
-    pos = args[0]
-    goal = pos * (max - min) + min
-    print(f"Neck tilt goal: {goal}")
-    velocity = args[1]
-    wait = True if args[2] == 1 else False
-    NeckTilt.moveto(goal,wait=wait,velocity=velocity)
-
+# Neck turn 85-193
 
 def moveHeadTurn(unused_addr, *args):
     min = 100
@@ -52,7 +45,6 @@ def moveHeadTurn(unused_addr, *args):
     wait = True if args[2] == 1 else False
     HeadTurn.moveto(goal,wait=wait,velocity=velocity)
 
-
 def moveHeadTilt(unused_addr, *args):
     min = 140
     max = 64
@@ -63,7 +55,6 @@ def moveHeadTilt(unused_addr, *args):
     wait = True if args[2] == 1 else False
     HeadTilt.moveto(goal,wait=wait,velocity=velocity)
 
-
 def moveMouth(unused_addr, *args):
     min = 320
     max = 341
@@ -73,6 +64,26 @@ def moveMouth(unused_addr, *args):
     velocity = args[1]
     wait = True if args[2] == 1 else False
     Mouth.moveto(goal,wait=wait,velocity=velocity)
+
+def moveNeckTilt(unused_addr, *args):
+    min = 156
+    max = 210
+    pos = args[0]
+    goal = pos * (max - min) + min
+    print(f"Neck tilt goal: {goal}")
+    velocity = args[1]
+    wait = True if args[2] == 1 else False
+    NeckTilt.moveto(goal,wait=wait,velocity=velocity)
+
+def moveNeckTurn(unused_addr, *args):
+    min = 85
+    max = 193
+    pos = args[0]
+    goal = pos * (max - min) + min
+    print(f"Neck turn goal: {goal}")
+    velocity = args[1]
+    wait = True if args[2] == 1 else False
+    NeckTurn.moveto(goal,wait=wait,velocity=velocity)
 
 
 # =========================
@@ -101,14 +112,15 @@ def enter_record_mode():
     moveHeadTurn(-1, 0.5, 0.25, 0)
     moveHeadTilt(-1, 0.5, 0.25, 0)
     moveMouth(-1, 0.5, 0.25, 0)
-    moveNeckTilt(-1, 0.8, 0.03, 1)
+    moveNeckTurn(-1, 0.5, 0.02, 0)
+    moveNeckTilt(-1, 0.8, 0.02, 1)
 
     print(f"Entering record mode")
     # some of the head motors have high gear ratio, so disabling the torque to make them more pushable
-    for m in headMotors:
+    for m in nonGravityMotors:
         m.disable_torque()
-    # neck is more prone to gravity, so switch to current-based position mode for some resisting force
-    for m in neckMotors:
+    # motors like neck tilt is more prone to gravity, so switch to current-based position mode for some resisting force
+    for m in gravityMotors:
         snapshots_before_record[m.ID] = m.snapshot_settings()
         m.set_operating_mode(CURRENT_BASED_POSITION_MODE)
         m.set_p_gain(POSITION_P_GAIN)  
@@ -116,9 +128,9 @@ def enter_record_mode():
         
 def exit_record_mode():
     print(f"Exiting record mode.")
-    for m in headMotors:
+    for m in nonGravityMotors:
         m.enable_torque()
-    for m in neckMotors:
+    for m in gravityMotors:
         snapshot = snapshots_before_record.get(m.ID)
         if snapshot:
             m.restore_settings(snapshot)
@@ -223,7 +235,7 @@ if __name__ == "__main__":
     except:
         if is_recording:
             exit_record_mode()
-        moveNeckTilt(-1, 0, 0.03, 1)
+        moveNeckTilt(-1, 0, 0.01, 1)
         for motor in motors:
             motor.disable_torque()
         NeckTilt.shutdownSeq()
@@ -231,7 +243,7 @@ if __name__ == "__main__":
     finally:
         if is_recording:
             exit_record_mode()
-        moveNeckTilt(-1, 0, 0.03, 1)
+        moveNeckTilt(-1, 0, 0.01, 1)
         for motor in motors:
             motor.disable_torque()
         NeckTilt.shutdownSeq()

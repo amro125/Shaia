@@ -1,0 +1,102 @@
+{
+    "nodsway": [{
+            "motor": "HeadTilt",
+            "startBeat": 0,
+            "periodBeat": 1,
+            "position": 0.2,
+            "velocity": 0.02
+        },
+        {
+            "motor": "HeadTilt",
+            "startBeat": 0.5,
+            "periodBeat": 1,
+            "position": 0.5,
+            "velocity": 0.02
+        },
+        {
+            "motor": "NeckTilt",
+            "startBeat": 0.05,
+            "periodBeat": 1,
+            "position": 0.3,
+            "velocity": 0.01
+        },
+        {
+            "motor": "NeckTilt",
+            "startBeat": 0.55,
+            "periodBeat": 1,
+            "position": 0.6,
+            "velocity": 0.01
+        },
+        {
+            "motor": "NeckTurn",
+            "startBeat": 0.25,
+            "periodBeat": 8,
+            "position": 0.2,
+            "velocity": 0.01
+        },
+        {
+            "motor": "NeckTurn",
+            "startBeat": 4.25,
+            "periodBeat": 8,
+            "position": 0.8,
+            "velocity": 0.01
+        }
+    ],
+    "headcircle": [{
+            "motor": "HeadTilt",
+            "startBeat": 0,
+            "periodBeat": 1,
+            "position": 0.2,
+            "velocity": 0.02
+        },
+        {
+            "motor": "HeadTilt",
+            "startBeat": 0.5,
+            "periodBeat": 1,
+            "position": 0.8,
+            "velocity": 0.02
+        },
+        {
+            "motor": "HeadTurn",
+            "startBeat": 0.25,
+            "periodBeat": 1,
+            "position": 0.3,
+            "velocity": 0.02
+        },
+        {
+            "motor": "HeadTurn",
+            "startBeat": 0.75,
+            "periodBeat": 1,
+            "position": 0.7,
+            "velocity": 0.02
+        },
+        {
+            "motor": "NeckTilt",
+            "startBeat": 0,
+            "periodBeat": 4,
+            "position": 0.8,
+            "velocity": 0.007
+        },
+        {
+            "motor": "NeckTilt",
+            "startBeat": 2,
+            "periodBeat": 4,
+            "position": 0.2,
+            "velocity": 0.007
+        },
+        {
+            "motor": "NeckTurn",
+            "startBeat": 0,
+            "periodBeat": 8,
+            "position": 0.2,
+            "velocity": 0.005
+        },
+        {
+            "motor": "NeckTurn",
+            "startBeat": 4,
+            "periodBeat": 8,
+            "position": 0.8,
+            "velocity": 0.005
+        }
+    ]
+}
