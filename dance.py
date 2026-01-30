@@ -153,7 +153,8 @@ if __name__ == "__main__":
 
     try:
         server = BlockingOSCUDPServer(("127.0.0.1", 9010), dispatcher)
-        server.serve_forever()  # Blocks forever
+        # server.serve_forever()  # Blocks forever
+        osc_dance("/dance", "nodsway", 40, 24)
     except:
         moveNeckTilt(-1, 0, 0.01, 1)
         for motor in motors:
