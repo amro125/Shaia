@@ -1,4 +1,7 @@
 import json
+import librosa
+import sounddevice as sd
+import soundfile as sf
 import time
 
 from utils.Dynamixelutils import dynamixel
@@ -12,7 +15,7 @@ from pythonosc.osc_server import BlockingOSCUDPServer
 # ===========
 #   MOTORS 
 # ===========
-port = '/dev/tty.usbserial-FT62AODN'
+port = '/dev/tty.usbserial-FT62AP2P'
 packethandle = PacketHandler(2.0)
 porthandle = PortHandler(port)
 
@@ -97,17 +100,100 @@ MOTOR_MAP = {
 with open("danceModes.json", "r") as f:
     DANCE_MODES = json.load(f)
 
+def get_audio_info(audio_filepath: str):
+    print("Extracting audio features...")
+    audio, sr = librosa.load(audio_filepath, sr=None)
+
+    tempo, beat_frames = librosa.beat.beat_track(y=audio, sr=sr)
+    tempo = tempo
+    print(f"Detected BPM: {tempo}")
+
+    # First beat time in seconds
+    if len(beat_frames) > 0:
+        first_beat_s = librosa.frames_to_time(beat_frames[0], sr=sr)
+    else:
+        first_beat_s = 0.0
+    print(f"detected first beat at {first_beat_s:.3f}s")
+
+    duration_s = len(audio) / sr
+    print(f"detected duration: {duration_s}s")
+
+    return tempo, duration_s, first_beat_s
+
+
+def normalize_bpm(bpm, bpm_min, bpm_max):
+    """
+    Fold BPM by factors of 2 until it fits nicely in [bpm_min, bpm_max].
+    """
+    dance_bpm = bpm
+
+    # Fold down (too fast → half-time)
+    while dance_bpm > bpm_max:
+        dance_bpm /= 2
+
+    # Fold up (too slow → double-time)
+    while dance_bpm < bpm_min:
+        dance_bpm *= 2
+
+    return dance_bpm
+
+def play_audio(audio_filepath):
+    data, samplerate = sf.read(audio_filepath, dtype='float32')
+    sd.play(data, samplerate)
+    return data, samplerate
+
 def osc_dance(unused_addr, *args):
+    """
+    Usage:
+      /dance mode audio_filepath
+      /dance mode bpm duration_s
+    """
     
-    mode_name = args[0]
-    bpm = args[1]
-    duration_s = args[2]
+    if len(args) < 2:
+        raise ValueError("OSC /dance requires at least 2 arguments")
 
-    if mode_name not in DANCE_MODES:
-        print(f"Mode '{mode_name}' not found!")
-        return
+    mode = args[0]
+    if mode not in DANCE_MODES:
+        raise ValueError(f"Mode '{mode}' not found!")
 
-    events = DANCE_MODES[mode_name]
+    if isinstance(args[1], str):
+        audio_filepath = args[1]
+        bpm_raw, duration_s, first_beat_s = get_audio_info(audio_filepath)
+        use_audio = True
+    elif len(args) >= 3:
+        bpm_raw = int(args[1])
+        duration_s = int(args[2])
+        first_beat_s = 0.0    
+        use_audio = False
+    else:
+        raise ValueError(
+            "Invalid OSC args. Use (mode, audio_filepath) or (mode, bpm, duration_s)"
+        )
+
+    if bpm_raw <= 10 or bpm_raw > 300:
+        raise ValueError(f"Invalid BPM: {bpm_raw}")
+    if duration_s <= 0:
+        raise ValueError(f"Invalid duration: {duration_s}")
+    print(f"OSC dance: mode={mode}, bpm={bpm_raw}, duration={duration_s}")
+
+
+    # neutral position
+    moveHeadTurn(-1, 0.5, 0.02, 0)
+    moveHeadTilt(-1, 0.5, 0.02, 0)
+    moveMouth(-1, 0.5, 0.02, 0)
+    moveNeckTurn(-1, 0.5, 0.02, 0)
+    moveNeckTilt(-1, 0.5, 0.02, 1)
+
+    bpm_min = DANCE_MODES[mode]["bpm_min"]
+    bpm_max = DANCE_MODES[mode]["bpm_max"]
+    bpm = normalize_bpm(bpm_raw, bpm_min, bpm_max)
+
+    print(
+        f"BPM mapping: audio BPM {bpm_raw} → dance BPM {bpm} "
+        f"(range {bpm_min}-{bpm_max} defined in danceModes.json)"
+    )
+
+    events = DANCE_MODES[mode]["moves"]
     beat_to_sec = 60 / bpm
 
     scaled_events = []
@@ -122,24 +208,33 @@ def osc_dance(unused_addr, *args):
             "velocity": e["velocity"]
         })
 
-    start_time = time.time()
-    print(f"Starting dance mode '{mode_name}' at {bpm} BPM for {duration_s} seconds...")
+    if use_audio:
+        data, sr = play_audio(audio_filepath)
+        time.sleep(first_beat_s)  # wait until first beat
 
-    while True:
-        t = time.time() - start_time
-        if t >= duration_s:
-            break
+    try:
+        start_time = time.time()
+        print(f"Starting dance mode '{mode}' at {bpm} BPM for {duration_s} seconds...")
 
-        for e in scaled_events:
-            if t >= e["start_s"]:
-                n = int((t - e["start_s"]) / e["period_s"])
-                next_trigger = e["start_s"] + n * e["period_s"]
-                if 0 <= t - next_trigger < 0.02:  # trigger window
-                    motor = MOTOR_MAP[e["motor"]]
-                    vel = e["velocity"]
-                    motor(-1, e["position"], vel, 0)
+        while True:
+            t = time.time() - start_time
+            if t >= duration_s - first_beat_s:
+                print("reached maximum duration, stopping robot movement")
+                break
 
-        time.sleep(0.01)
+            for e in scaled_events:
+                if t >= e["start_s"]:
+                    n = int((t - e["start_s"]) / e["period_s"])
+                    next_trigger = e["start_s"] + n * e["period_s"]
+                    if 0 <= t - next_trigger < 0.02:  # trigger window
+                        motor = MOTOR_MAP[e["motor"]]
+                        vel = e["velocity"]
+                        motor(-1, e["position"], vel, 0)
+
+            time.sleep(0.01)
+    finally:
+        if use_audio:
+            sd.wait()  # blocks until playback finishes
 
 if __name__ == "__main__":
     dispatcher.map("/dance", osc_dance)
@@ -154,14 +249,19 @@ if __name__ == "__main__":
     try:
         server = BlockingOSCUDPServer(("127.0.0.1", 9010), dispatcher)
         # server.serve_forever()  # Blocks forever
-        osc_dance("/dance", "nodsway", 40, 24)
+        # osc_dance("/dance", "nodsway", 40, 12)
+        # osc_dance("/dance", "headcircle", 70, 12)
+        osc_dance("/dance", "headcircle", ".data/supernatural_opening.wav")
+        # osc_dance("/dance", "nodsway", ".data/bedroomTalk_opening.wav")
     except:
+        print("Caught exception")
         moveNeckTilt(-1, 0, 0.01, 1)
         for motor in motors:
             motor.disable_torque()
         NeckTilt.shutdownSeq()
         HeadTurn.shutdownSeq()
     finally:
+        print("Cleaning up")
         moveNeckTilt(-1, 0, 0.01, 1)
         for motor in motors:
             motor.disable_torque()

@@ -28,7 +28,7 @@ def hit(unused_addr, *args):
 if __name__ == "__main__":
     
     port = '/dev/tty.usbserial-FT62AOPZ'
-    port2 = '/dev/tty.usbserial-FT62AODN'
+    port2 = '/dev/tty.usbserial-FT62AP2P'
     
     # porthandle1 = PortHandler(port)
     packethandle = PacketHandler(2.0)

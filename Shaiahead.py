@@ -13,7 +13,7 @@ dispatcher = Dispatcher()
 # ===========
 #   MOTORS 
 # ===========
-port = '/dev/tty.usbserial-FT62AODN'
+port = '/dev/tty.usbserial-FT62AP2P'
 packethandle = PacketHandler(2.0)
 porthandle = PortHandler(port)
 
