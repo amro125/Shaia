@@ -3,12 +3,12 @@ import librosa
 import sounddevice as sd
 import soundfile as sf
 import time
+import numpy as np
 
 from utils.Dynamixelutils import dynamixel
 from dynamixel_sdk import *                    # Uses Dynamixel SDK library
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import BlockingOSCUDPServer
-
 
 
 
@@ -142,6 +142,18 @@ def play_audio(audio_filepath):
     sd.play(data, samplerate)
     return data, samplerate
 
+def make_tick(sr=44100, freq=1000, duration=0.03):
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    tick = 0.5 * np.sin(2 * np.pi * freq * t)
+    return tick.astype(np.float32), sr
+
+TICK_SOUND, TICK_SR = make_tick()
+def play_tick():
+    sd.play(TICK_SOUND, TICK_SR, blocking=False)
+
+
+# [bpm1, bpm2, bpm3]
+# [startsec1, startsec2, startsec3]
 def osc_dance(unused_addr, *args):
     """
     Usage:
@@ -181,8 +193,8 @@ def osc_dance(unused_addr, *args):
     moveHeadTurn(-1, 0.5, 0.02, 0)
     moveHeadTilt(-1, 0.5, 0.02, 0)
     moveMouth(-1, 0.5, 0.02, 0)
-    moveNeckTurn(-1, 0.5, 0.02, 0)
-    moveNeckTilt(-1, 0.5, 0.02, 1)
+    moveNeckTurn(-1, 0.5, 0.02, 1)
+    # moveNeckTilt(-1, 0.5, 0.02, 1)
 
     bpm_min = DANCE_MODES[mode]["bpm_min"]
     bpm_max = DANCE_MODES[mode]["bpm_max"]
@@ -195,6 +207,7 @@ def osc_dance(unused_addr, *args):
 
     events = DANCE_MODES[mode]["moves"]
     beat_to_sec = 60 / bpm
+    next_tick_time = 0.0
 
     scaled_events = []
     for e in events:
@@ -222,11 +235,15 @@ def osc_dance(unused_addr, *args):
                 print("reached maximum duration, stopping robot movement")
                 break
 
-            for e in scaled_events:
+            if not use_audio and t >= next_tick_time:
+                play_tick()
+                next_tick_time += beat_to_sec
+
+            for i, e in enumerate(scaled_events):
                 if t >= e["start_s"]:
                     n = int((t - e["start_s"]) / e["period_s"])
                     next_trigger = e["start_s"] + n * e["period_s"]
-                    if 0 <= t - next_trigger < 0.02:  # trigger window
+                    if 0 <= t - next_trigger < 0.07:  # trigger window
                         motor = MOTOR_MAP[e["motor"]]
                         vel = e["velocity"]
                         motor(-1, e["position"], vel, 0)
@@ -235,6 +252,23 @@ def osc_dance(unused_addr, *args):
     finally:
         if use_audio:
             sd.wait()  # blocks until playback finishes
+
+modes = {
+    1: "nod_sway",
+    2: "head_circle",
+    3: "ar_sway",
+    4: "lq_sway",
+    5: "circle",
+    6: "build"
+}
+song_list = {
+    1: "./data/bedroomTalk_opening.wav",
+    2: "./data/janeDoe.wav",
+    3: "./data/supernatural_opening.wav",
+    4: "./data/tattoo_opening.wav",
+    5: "./data/weWillRockYou.wav",
+    6: "./data/byeSummer_opening.wav",
+}
 
 if __name__ == "__main__":
     dispatcher.map("/dance", osc_dance)
@@ -249,10 +283,8 @@ if __name__ == "__main__":
     try:
         server = BlockingOSCUDPServer(("127.0.0.1", 9010), dispatcher)
         # server.serve_forever()  # Blocks forever
-        # osc_dance("/dance", "nodsway", 40, 12)
-        # osc_dance("/dance", "headcircle", 70, 12)
-        osc_dance("/dance", "headcircle", ".data/supernatural_opening.wav")
-        # osc_dance("/dance", "nodsway", ".data/bedroomTalk_opening.wav")
+        osc_dance("/dance", modes[6], song_list[6])
+        # osc_dance("/dance", modes[5], 35, 24)
     except:
         print("Caught exception")
         moveNeckTilt(-1, 0, 0.01, 1)
