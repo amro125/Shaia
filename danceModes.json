@@ -1,5 +1,6 @@
 {
     "nod_sway": {
+        "energy": 0.7,
         "bpm_min": 35,
         "bpm_max": 60,
         "moves": [{
@@ -61,6 +62,7 @@
         ]
     },
     "ar_sway": {
+        "energy": 0.6,
         "bpm_min": 35,
         "bpm_max": 80,
         "moves": [{
@@ -122,6 +124,7 @@
         ]
     },
     "lq_sway": {
+        "energy": 0.3,
         "bpm_min": 30,
         "bpm_max": 60,
         "moves": [{
@@ -183,6 +186,7 @@
         ]
     },
     "head_circle": {
+        "energy": 0.2,
         "bpm_min": 30,
         "bpm_max": 70,
         "moves": [{
@@ -244,6 +248,7 @@
         ]
     },
     "circle": {
+        "energy": 0.1,
         "bpm_min": 35,
         "bpm_max": 70,
         "moves": [{
@@ -305,6 +310,7 @@
         ]
     },
     "build": {
+        "energy": 0.9,
         "bpm_min": 60,
         "bpm_max": 110,
         "moves": [{
