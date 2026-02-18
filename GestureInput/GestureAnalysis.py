@@ -1,7 +1,7 @@
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-from Shaiahead import RECORD_DT, save_path
+from GestureInput.Shaiahead import RECORD_DT, save_path
 import numpy as np
 
 def infer_bpm_from_positions(

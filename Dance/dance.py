@@ -10,7 +10,7 @@ from utils.Dynamixelutils import dynamixel
 from dynamixel_sdk import *                    # Uses Dynamixel SDK library
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import BlockingOSCUDPServer
-from AudioAnalysis import get_audio_sections
+from Dance.AudioAnalysis import get_audio_sections
 
 
 # ===========

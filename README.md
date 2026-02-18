@@ -20,3 +20,8 @@ After installing new dependencies, update `requirements.txt` so other developers
 ```
 pip freeze > requirements.txt
 ```
+
+### Run a module
+```
+python -m Dance.dance
+```

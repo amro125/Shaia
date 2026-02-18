@@ -1,3 +1,5 @@
+# This file is an extension from Shaiahead that allows Gesture Editing during playback.
+
 import json
 import os
 import threading

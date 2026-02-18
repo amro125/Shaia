@@ -70,7 +70,7 @@ def detect_structural_boundaries(audio, sr, kernel_size=32, percentile=95,
         plt.xlabel("Time (s)")
         plt.ylabel("Novelty")
         plt.legend()
-        plt.savefig("novelty_plot.png", dpi=300, bbox_inches="tight")
+        plt.savefig("Dance/novelty_plot.png", dpi=300, bbox_inches="tight")
         print(f"Saved novelty plot to novelty_plot.png")
 
     return np.unique(times).tolist()
@@ -335,7 +335,7 @@ song_list = {
 
 import time
 if __name__ == "__main__":
-    songIndex = 5
+    songIndex = 1
 
     # 1 ~ 0.4
     # 2 ~ 0.5-0.6
@@ -348,7 +348,7 @@ if __name__ == "__main__":
     tempo_sections, duration_s, first_beat_s = get_audio_sections(
         song_list[songIndex], 
         novelty_percentile=90,
-        verbose=False
+        verbose=True
     )
 
     # Extract boundaries from tempo_sections
