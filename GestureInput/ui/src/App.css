@@ -1,0 +1,158 @@
+html,
+body,
+#root {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    font-family: "Inter", sans-serif;
+    background-color: #1F2933;
+    color: #000000;
+}
+
+
+/* Layout */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+.region {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+
+/* Regions */
+
+.record {
+    background-color: #2F80ED;
+    flex: 4;
+}
+
+.playback {
+    background-color: #27AE60;
+    flex: 6;
+}
+
+
+/* ------------------ */
+
+
+/* BIG BUTTON */
+
+
+/* ------------------ */
+
+.big-button {
+    background-color: #F2C94C;
+    color: #000000;
+    border: none;
+    padding: 20px 60px;
+    font-size: 22px;
+    font-weight: 600;
+    border-radius: 16px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+    transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.15s ease;
+}
+
+
+/* Hover state */
+
+.big-button:hover {
+    background-color: #c19100;
+}
+
+
+/* Pressed state */
+
+.big-button:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+
+/* STOP emphasis */
+
+.stop-button {
+    font-size: 26px;
+    font-weight: 700;
+}
+
+
+/* ------------------ */
+
+
+/* SMALL BUTTONS */
+
+
+/* ------------------ */
+
+.sub-controls {
+    margin-top: 30px;
+    display: flex;
+    gap: 20px;
+}
+
+.small-button {
+    background-color: #F2C94C;
+    color: #000000;
+    border: none;
+    padding: 18px 36px;
+    font-size: 18px;
+    font-weight: 600;
+    border-radius: 14px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+    transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.15s ease;
+}
+
+
+/* Hover */
+
+.small-button:hover {
+    background-color: #c19100;
+}
+
+
+/* Pressed */
+
+.small-button:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+
+/* Remove default focus outline and add controlled focus state */
+
+button:focus {
+    outline: none;
+}
+
+button:focus-visible {
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35);
+}
+
+
+/* Active button state */
+
+.big-button.active,
+.small-button.active {
+    background-color: #000000;
+    color: #FFFFFF;
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.6);
+}
+
+
+/* Disabled state */
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}

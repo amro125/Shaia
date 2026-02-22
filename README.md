@@ -25,3 +25,34 @@ pip freeze > requirements.txt
 ```
 python -m Dance.dance
 ```
+
+## Dev Setup for Gesture Input with UI Control
+In the future, we may switch to use physical buttons to control gesture recording and editing, but for now we test with UI. 
+This is how we set up the development environment to test the full stack.
+
+```
+React UI (browser)
+        ↓ HTTP
+FastAPI Bridge (8000)
+        ↓ OSC UDP
+Python Server (9010)
+        ↓
+Dynamixel Motors
+```
+
+1. Run OSC bridge
+```
+cd Shaia/GestureInput/
+uvicorn osc_bridge:app --reload --port 8000
+```
+2. Run Frontend and visit the local host
+```
+cd Shaia/GestureInput/ui
+npm run dev
+```
+3. Run the python code for recording and editing gestures
+```
+cd Shaia
+python -m GestureInput.RecordEditGestures
+```
+
