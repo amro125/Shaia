@@ -7,11 +7,11 @@ import time
 import numpy as np
 
 from utils.Dynamixelutils import dynamixel
+from concurrent.futures import ThreadPoolExecutor
 from dynamixel_sdk import *                    # Uses Dynamixel SDK library
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import BlockingOSCUDPServer
-from Dance.AudioAnalysis import get_audio_sections
-
+from Dance.AudioAnalysis import get_audio_sections, lip_sync
 
 # ===========
 #   MOTORS 
@@ -57,8 +57,8 @@ def moveHeadTilt(unused_addr, *args):
     HeadTilt.moveto(goal,wait=wait,velocity=velocity)
 
 def moveMouth(unused_addr, *args):
-    min = 320
-    max = 341
+    min = 341
+    max = 320
     pos = args[0]
     goal = pos * (max - min) + min
     print(f"Mouth goal: {goal}")
@@ -98,29 +98,8 @@ MOTOR_MAP = {
     "Mouth": moveMouth
 }
 
-with open("danceModes.json", "r") as f:
+with open("Dance/danceModes.json", "r") as f:
     DANCE_MODES = json.load(f)
-
-def get_audio_info(audio_filepath: str):
-    print("Extracting audio features...")
-    audio, sr = librosa.load(audio_filepath, sr=None)
-
-    tempo, beat_frames = librosa.beat.beat_track(y=audio, sr=sr)
-    tempo = tempo
-    print(f"Detected BPM: {tempo}")
-
-    # First beat time in seconds
-    if len(beat_frames) > 0:
-        first_beat_s = librosa.frames_to_time(beat_frames[0], sr=sr)
-    else:
-        first_beat_s = 0.0
-    print(f"detected first beat at {first_beat_s:.3f}s")
-
-    duration_s = len(audio) / sr
-    print(f"detected duration: {duration_s}s")
-
-    return tempo, duration_s, first_beat_s
-
 
 def normalize_bpm(bpm, bpm_min, bpm_max):
     """
@@ -152,7 +131,7 @@ TICK_SOUND, TICK_SR = make_tick()
 def play_tick():
     sd.play(TICK_SOUND, TICK_SR, blocking=False)
 
-def schedule_dance_moves(tempo_sections, section_modes, duration_s):
+def schedule_dance_moves(tempo_sections, section_modes, duration_s, scale=1.0):
     sections_schedule = []
     for i, section in enumerate(tempo_sections):
         section_start = section['start_s']
@@ -167,12 +146,21 @@ def schedule_dance_moves(tempo_sections, section_modes, duration_s):
         # precompute scaled events
         events = []
         for e in DANCE_MODES[mode]['moves']:
+
+            base_pos = e['position']
+            scaled_pos = 0.5 + (base_pos - 0.5) * scale
+            scaled_pos = max(0.0, min(1.0, scaled_pos))
+
+            vel = e['velocity']
+            if scale < 1.0:
+                print(f"scaling vel from {vel} to {vel * scale}")
+                vel = vel * scale
             events.append({
                 'motor': e['motor'],
                 'start_s': section_start + e['startBeat']*beat_to_sec,
                 'period_s': e['periodBeat']*beat_to_sec,
-                'position': e['position'],
-                'velocity': e['velocity']
+                'position': scaled_pos,
+                'velocity': vel
             })
         
         section_json = {
@@ -186,12 +174,12 @@ def schedule_dance_moves(tempo_sections, section_modes, duration_s):
         }
         sections_schedule.append(section_json)
 
-        section_to_print = {k: v for k, v in section_json.items() if k != 'events'}
         print(f"Section {i}: BPM={bpm}; StartTime={section_start}s; Mode={mode}.")
 
     return sections_schedule
 
 
+LIP_SYNC_ADVANCE_TIME = 0.2
 def osc_dance(unused_addr, *args):
     """
     Usage:
@@ -229,17 +217,24 @@ def osc_dance(unused_addr, *args):
             section_modes.append(mode)
             tempo_sections.append({"bpm": bpm, "start_s": start_s})
 
+
+        env_times = []
+        env_values = []
+
         use_audio = False
         first_beat_s = 0.0
 
     else:
         # == USE CASE 2: audio file ==
         audio_filepath = args[0]
-        tempo_sections, duration_s, first_beat_s = get_audio_sections(
-            audio_filepath,
-            novelty_percentile=90,
-            verbose=False
-        )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_sections = executor.submit(get_audio_sections, audio_filepath, novelty_percentile=90, verbose=False)
+            future_lip = executor.submit(lip_sync, audio_filepath, threshold=0.05)
+
+            tempo_sections, duration_s, first_beat_s = future_sections.result()
+            env_times, env_values = future_lip.result()
+
         use_audio = True
 
         # assign section modes with optimal bpm and no consecutive repeats
@@ -272,14 +267,19 @@ def osc_dance(unused_addr, *args):
 
     if duration_s <= 0:
         raise ValueError(f"Invalid duration: {duration_s}")
-    sections_schedule = schedule_dance_moves(tempo_sections, section_modes, duration_s)
+    
+    movement_scale = 1.0
+    # optionally scale down movement to examine lip sync better
+    # This is not used because scaled down movement is not smooth (stops before reaching max position)
+    if len(env_times) > 0: movement_scale = 0.5
+    sections_schedule = schedule_dance_moves(tempo_sections, section_modes, duration_s, scale=movement_scale)
 
     # neutral position
     moveHeadTurn(-1, 0.5, 0.02, 0)
     moveHeadTilt(-1, 0.5, 0.02, 0)
-    moveMouth(-1, 0.5, 0.02, 0)
-    moveNeckTurn(-1, 0.5, 0.02, 1)
-    # moveNeckTilt(-1, 0.5, 0.02, 1)
+    moveMouth(-1, 0, 0.02, 0)
+    moveNeckTurn(-1, 0.5, 0.02, 0)
+    moveNeckTilt(-1, 0.5, 0.02, 1)
 
     if use_audio:
         data, sr = play_audio(audio_filepath)
@@ -291,12 +291,19 @@ def osc_dance(unused_addr, *args):
         # next_tick_time = 0.0
         print(f"Starting dance mode '{section_modes[current_section_idx]}' at {tempo_sections[current_section_idx]['bpm']} BPM for section starting at {tempo_sections[current_section_idx]['start_s']:.2f}s")
        
+        mouth_idx = -1
         while True:
             t = time.time() - start_time
             if t >= duration_s - first_beat_s:
                 print("reached maximum duration, stopping robot movement")
                 break
+            
+            # lip syncing
+            if len(env_times) > 0 and mouth_idx + 1 < len(env_times) and t + first_beat_s >= env_times[mouth_idx + 1] - LIP_SYNC_ADVANCE_TIME:
+                mouth_idx += 1
+                moveMouth(-1, env_values[mouth_idx], 0.1, 0)
 
+            # section dance switch
             if (current_section_idx + 1 < len(sections_schedule) and
                 t >= sections_schedule[current_section_idx + 1]['start_s']):
                 current_section_idx += 1
@@ -304,7 +311,7 @@ def osc_dance(unused_addr, *args):
                 print(f"Starting dance mode '{sec['mode']}' at {sec['bpm_val']} BPM for section starting at {sec['start_s']:.2f}s")
             sec = sections_schedule[current_section_idx]
 
-            # execute events
+            # execute events in the current section
             for i, e in enumerate(sec['events']):
                 if t >= e["start_s"]:
                     n = int((t - e["start_s"]) / e["period_s"])
@@ -352,6 +359,7 @@ if __name__ == "__main__":
         7: "./data/tattoo.wav",
         8: "./data/bedroomTalk.wav",
         9: "./data/weWillRockYou.wav",
+        10: "./data/needYouNow.wav"
     }
     try:
         server = BlockingOSCUDPServer(("127.0.0.1", 9010), dispatcher)
@@ -371,7 +379,7 @@ if __name__ == "__main__":
 
         # == USE CASE 2. Dance to an input audio with automatic segmentations ==
         # /dance audio_filepath
-        osc_dance("/dance", song_list[8])
+        osc_dance("/dance", song_list[10])
 
     except Exception as e:
         print(f"Caught exception: {e}")

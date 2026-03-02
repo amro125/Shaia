@@ -1,8 +1,112 @@
 import librosa
+import matplotlib
+matplotlib.use("Agg")  # non-GUI backend (thread-safe)
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+import subprocess
+
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import find_peaks
+
+# ===========================
+#    Source Separation
+# ===========================
+
+def separate_source(audio_file, model="htdemucs", track_to_separate="vocals", force_separate=False):
+    """
+    Runs Demucs and returns path to separated track.
+    """
+    out_dir = "data/separated"
+    audio_name = os.path.splitext(os.path.basename(audio_file))[0]
+    track_path = os.path.join(
+        out_dir, model, audio_name, f"{track_to_separate}.wav"
+    )
+    if not force_separate and os.path.isfile(track_path):
+        print("Existing separated track. Skipping source separation to reuse.")
+        return track_path
+
+    os.makedirs(out_dir, exist_ok=True)
+
+    print(f"Source-separating {audio_file} for {track_to_separate} track.")
+
+    cmd = [
+        "demucs",
+        "-n", model,
+        f"--two-stems={track_to_separate}",
+        "-o", out_dir,
+        audio_file
+    ]
+    subprocess.run(cmd, check=True)
+
+    if not os.path.exists(track_path):
+        raise FileNotFoundError(f"{track_to_separate} stem not found after Demucs separation.")
+
+    return track_path
+
+
+# ===========================
+#         Lip Syncing
+# ===========================
+
+def extract_envelope(track_path,
+                     threshold=0,
+                     hop_length=512,
+                     smooth_sigma=4,
+                     compress_gamma=0.6):
+    """
+    Compute smoothed, compressed envelope.
+    Only returns times when the value changes (optionally using a threshold).
+
+    Returns:
+        times : np.ndarray
+            Times (s) when envelope changes significant enough.
+        positions : np.ndarray
+            Corresponding motor positions [0, 1].
+    """
+    y, sr = librosa.load(track_path, sr=None)
+
+    # RMS amplitude
+    rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
+    rms_smooth = gaussian_filter1d(rms, sigma=smooth_sigma)
+    rms_norm = rms_smooth / (np.max(rms_smooth) + 1e-8)
+
+    # Mild compression (prevents tiny mouth movement)
+    envelope = rms_norm ** compress_gamma
+
+    frame_times = librosa.frames_to_time(
+        np.arange(len(rms_norm)),
+        sr=sr,
+        hop_length=hop_length
+    )
+
+
+    times, positions = [], []
+    last_val = envelope[0]
+    for t, val in zip(frame_times, envelope):
+        if abs(val - last_val) >= threshold:
+            times.append(t)
+            positions.append(val)
+            last_val = val
+
+
+    # Plot
+    plt.figure(figsize=(12, 4))
+    plt.plot(frame_times, envelope, label="Envelope (all frames)", alpha=0.5)
+    plt.plot(times, positions, 'r.-', label=f"Envelope (threshold={threshold})")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Normalized Amplitude")
+    plt.title("Smoothed Vocal Envelope")
+    plt.legend()
+    plt.ylim(0, 1.05)
+    plt.tight_layout()
+    plt.savefig("Dance/lipsync_envelop.png", dpi=300, bbox_inches="tight")
+
+    return np.array(times), positions
+
+def lip_sync(audio_file, threshold=0):
+    vocal_track = separate_source(audio_file)
+    return extract_envelope(vocal_track, threshold=threshold)
 
 # ===========================
 #    Structure Detections
@@ -331,36 +435,37 @@ song_list = {
     7: "./data/tattoo.wav",
     8: "./data/bedroomTalk.wav",
     9: "./data/weWillRockYou.wav",
+    10: "./data/needYouNow.wav"
 }
 
 import time
 if __name__ == "__main__":
-    songIndex = 1
-
-    # 1 ~ 0.4
-    # 2 ~ 0.5-0.6
-    # 3 ~ 0.4-0.6
-    # 5 ~ 0.3-0.6
-    # 7 ~ 0.3-0.5
-
+    songIndex = 10
 
     start_time = time.time()  # Start timer
-    tempo_sections, duration_s, first_beat_s = get_audio_sections(
-        song_list[songIndex], 
-        novelty_percentile=90,
-        verbose=True
-    )
 
-    # Extract boundaries from tempo_sections
-    boundaries = [sec["start_s"] for sec in tempo_sections]
+    print(lip_sync(song_list[songIndex], threshold=0.1))
     end_time = time.time()  # End timer
-    print(f"Analysis took {end_time - start_time:.2f} seconds")
+    print(f"Source separation took {end_time - start_time:.2f} seconds")
 
-    # Load audio again to modify
-    audio, sr = librosa.load(song_list[songIndex], sr=None)
-    audio_with_beeps = add_beeps_to_boundaries(audio, sr, boundaries)
 
-    # Save the new audio
-    sf.write("./data/segmented.wav", audio_with_beeps, sr)
+    # start_time = time.time()  # Start timer
+    # tempo_sections, duration_s, first_beat_s = get_audio_sections(
+    #     song_list[songIndex], 
+    #     novelty_percentile=90,
+    #     verbose=True
+    # )
+
+    # # Extract boundaries from tempo_sections
+    # boundaries = [sec["start_s"] for sec in tempo_sections]
+    # end_time = time.time()  # End timer
+    # print(f"Analysis took {end_time - start_time:.2f} seconds")
+
+    # # Load audio again to modify
+    # audio, sr = librosa.load(song_list[songIndex], sr=None)
+    # audio_with_beeps = add_beeps_to_boundaries(audio, sr, boundaries)
+
+    # # Save the new audio
+    # sf.write("./data/segmented.wav", audio_with_beeps, sr)
     
-    print(f"Saved audio with beeps at section boundaries!")
+    # print(f"Saved audio with beeps at section boundaries!")
