@@ -1,3 +1,4 @@
+import json
 import librosa
 import matplotlib
 matplotlib.use("Agg")  # non-GUI backend (thread-safe)
@@ -53,7 +54,8 @@ def extract_envelope(track_path,
                      threshold=0,
                      hop_length=512,
                      smooth_sigma=4,
-                     compress_gamma=0.6):
+                     compress_gamma=0.6,
+                     audio_feature="waveform"): # [rms, waveform]
     """
     Compute smoothed, compressed envelope.
     Only returns times when the value changes (optionally using a threshold).
@@ -66,29 +68,37 @@ def extract_envelope(track_path,
     """
     y, sr = librosa.load(track_path, sr=None)
 
-    # RMS amplitude
-    rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
-    rms_smooth = gaussian_filter1d(rms, sigma=smooth_sigma)
-    rms_norm = rms_smooth / (np.max(rms_smooth) + 1e-8)
+    # amplitude
+    if audio_feature == "rms":
+        amplitude = librosa.feature.rms(y=y, hop_length=hop_length)[0]
+    elif audio_feature == "waveform":
+        abs_y = np.abs(y)
+        amplitude = np.array([
+            np.max(abs_y[i : i + hop_length]) 
+            for i in range(0, len(abs_y), hop_length)
+        ])
+
+    amplitude_smooth = gaussian_filter1d(amplitude, sigma=smooth_sigma)
+    amplitude_norm = amplitude_smooth / (np.max(amplitude_smooth) + 1e-8)
 
     # Mild compression (prevents tiny mouth movement)
-    envelope = rms_norm ** compress_gamma
-
+    envelope = amplitude_norm ** compress_gamma
+    
     frame_times = librosa.frames_to_time(
-        np.arange(len(rms_norm)),
+        np.arange(len(amplitude_norm)),
         sr=sr,
         hop_length=hop_length
     )
-
 
     times, positions = [], []
     last_val = envelope[0]
     for t, val in zip(frame_times, envelope):
         if abs(val - last_val) >= threshold:
+            # Prefer wider movement
+            display_val = np.clip(val * 1.2, 0, 1)
             times.append(t)
-            positions.append(val)
+            positions.append(display_val)
             last_val = val
-
 
     # Plot
     plt.figure(figsize=(12, 4))
@@ -100,13 +110,18 @@ def extract_envelope(track_path,
     plt.legend()
     plt.ylim(0, 1.05)
     plt.tight_layout()
-    plt.savefig("Dance/lipsync_envelop.png", dpi=300, bbox_inches="tight")
+    audio_name = track_path.split("/")[-2]
+    plt.savefig(f"data/lipsync_positions/{audio_name}.png", dpi=300, bbox_inches="tight")
 
     return np.array(times), positions
 
-def lip_sync(audio_file, threshold=0):
+def lip_sync(
+        audio_file, 
+        threshold=0,
+        audio_feature="waveform"
+    ):
     vocal_track = separate_source(audio_file)
-    return extract_envelope(vocal_track, threshold=threshold)
+    return extract_envelope(vocal_track, threshold=threshold, audio_feature=audio_feature)
 
 # ===========================
 #    Structure Detections
@@ -281,6 +296,7 @@ def get_audio_sections(
     novelty_percentile=95,
     bpm_change_thresh=10.0,
     hop_length=512,
+    force_segment=False,
     verbose=False):
     """
     - detect structural section changes
@@ -293,6 +309,20 @@ def get_audio_sections(
       duration_s
       first_beat_s
     """
+
+    out_dir = "data/segmented"
+    audio_name = os.path.splitext(os.path.basename(audio_filepath))[0]
+    json_path = os.path.join(
+        out_dir, f"{audio_name}.json"
+    )
+    if not force_segment and os.path.isfile(json_path):
+        print("Existing segmented result. Skipping segmentation to reuse.")
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return data["tempo_sections"], data["duration_s"], data["first_beat_s"]
+
+    os.makedirs(out_dir, exist_ok=True)
+
     print(f"Loading audio {audio_filepath}...")
     audio, sr = librosa.load(audio_filepath, sr=None)
     duration_s = len(audio) / sr
@@ -374,6 +404,17 @@ def get_audio_sections(
     for sec in tempo_sections:
         print(f"  BPM {sec["bpm"]:.1f} @ {sec["start_s"]:.2f}s")
 
+    output_data = {
+        "audio_name": audio_name,
+        "duration_s": duration_s,
+        "first_beat_s": first_beat_s,
+        "tempo_sections": tempo_sections
+    }
+    
+    with open(json_path, 'w') as f:
+        json.dump(output_data, f, indent=4)
+    
+    print(f"Analysis saved to {json_path}")
     return tempo_sections, duration_s, first_beat_s
 
 

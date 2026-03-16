@@ -179,7 +179,6 @@ LIP_SYNC_ADVANCE_TIME = 0.2
 def osc_dance(unused_addr, *args):
     """
     Usage:
-      # USE CASE 1: /dance test duration_s mode1 bpm1 start1 mode2 bpm2 start2 ...
       # USE CASE 2: /dance audio_filepath
     """
     
@@ -187,7 +186,7 @@ def osc_dance(unused_addr, *args):
         raise ValueError("OSC /dance requires at least 1 arguments")
     
     audio_filepath = args[0]
-    env_times, env_values = lip_sync(audio_filepath, threshold=0.05)
+    env_times, env_values = lip_sync(audio_filepath, threshold=0.05, audio_feature="rms")
 
     # neutral position
     moveHeadTurn(-1, 0.5, 0.02, 0)
@@ -212,7 +211,7 @@ def osc_dance(unused_addr, *args):
             # lip syncing
             if len(env_times) > 0 and mouth_idx + 1 < len(env_times) and t >= env_times[mouth_idx + 1] - LIP_SYNC_ADVANCE_TIME:
                 mouth_idx += 1
-                moveMouth(-1, env_values[mouth_idx], 0.1, 0)
+                moveMouth(-1, env_values[mouth_idx], 0.2, 0)
             time.sleep(0.01)
     finally:
         sd.wait()  # blocks until playback finishes
@@ -237,14 +236,15 @@ if __name__ == "__main__":
         7: "./data/tattoo.wav",
         8: "./data/bedroomTalk.wav",
         9: "./data/weWillRockYou.wav",
-        10: "./data/needYouNow.wav"
+        10: "./data/needYouNow.wav",
+        11: "./data/BadForMe.wav"
     }
     try:
         server = BlockingOSCUDPServer(("127.0.0.1", 9010), dispatcher)
         # server.serve_forever()  # Blocks forever
 
         # /dance audio_filepath
-        osc_dance("/dance", song_list[8])
+        osc_dance("/dance", song_list[11])
 
     except Exception as e:
         print(f"Caught exception: {e}")

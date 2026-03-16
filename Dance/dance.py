@@ -179,7 +179,7 @@ def schedule_dance_moves(tempo_sections, section_modes, duration_s, scale=1.0):
     return sections_schedule
 
 
-LIP_SYNC_ADVANCE_TIME = 0.2
+LIP_SYNC_ADVANCE_TIME = 0.3
 def osc_dance(unused_addr, *args):
     """
     Usage:
@@ -230,7 +230,7 @@ def osc_dance(unused_addr, *args):
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             future_sections = executor.submit(get_audio_sections, audio_filepath, novelty_percentile=90, verbose=False)
-            future_lip = executor.submit(lip_sync, audio_filepath, threshold=0.05)
+            future_lip = executor.submit(lip_sync, audio_filepath, threshold=0.05, audio_feature="waveform")
 
             tempo_sections, duration_s, first_beat_s = future_sections.result()
             env_times, env_values = future_lip.result()
@@ -271,7 +271,7 @@ def osc_dance(unused_addr, *args):
     movement_scale = 1.0
     # optionally scale down movement to examine lip sync better
     # This is not used because scaled down movement is not smooth (stops before reaching max position)
-    if len(env_times) > 0: movement_scale = 0.5
+    if len(env_times) > 0: movement_scale = 0.3
     sections_schedule = schedule_dance_moves(tempo_sections, section_modes, duration_s, scale=movement_scale)
 
     # neutral position
@@ -301,7 +301,7 @@ def osc_dance(unused_addr, *args):
             # lip syncing
             if len(env_times) > 0 and mouth_idx + 1 < len(env_times) and t + first_beat_s >= env_times[mouth_idx + 1] - LIP_SYNC_ADVANCE_TIME:
                 mouth_idx += 1
-                moveMouth(-1, env_values[mouth_idx], 0.1, 0)
+                moveMouth(-1, env_values[mouth_idx], 0.25, 0)
 
             # section dance switch
             if (current_section_idx + 1 < len(sections_schedule) and
@@ -359,8 +359,10 @@ if __name__ == "__main__":
         7: "./data/tattoo.wav",
         8: "./data/bedroomTalk.wav",
         9: "./data/weWillRockYou.wav",
-        10: "./data/needYouNow.wav"
+        10: "./data/needYouNow.wav",
+        11: "./data/BadForMe.wav"
     }
+
     try:
         server = BlockingOSCUDPServer(("127.0.0.1", 9010), dispatcher)
         # server.serve_forever()  # Blocks forever
