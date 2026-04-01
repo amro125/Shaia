@@ -369,6 +369,8 @@ def playback():
             else:
                 # regular playback
                 with port_lock:
+                    # scale down velocity if human is editing
+                    # vel = 0.01 if len(current_editing_group) > 0 else None
                     m.moveto(frame[str(m.ID)], convertToTick=False)
 
         time.sleep(RECORD_DT)

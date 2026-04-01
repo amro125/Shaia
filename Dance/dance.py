@@ -346,7 +346,9 @@ if __name__ == "__main__":
         3: "lq_sway",
         4: "head_circle",
         5: "circle",
-        6: "build"
+        6: "build",
+        7: "ballet_nod",
+        8: "ballet_sway"
     }
     
     song_list = {
@@ -369,19 +371,24 @@ if __name__ == "__main__":
 
         # == USE CASE 1. Test specific dance modes with user-specified duration, BPMs and start_secs ==
         # /dance test <duration_s> (<mode> <bpm> <start_s>)+
-        # osc_dance(
-        #     "/dance", "test", 72, 
+        osc_dance(
+            "/dance", "test", 48, 
+            modes[7], 56, 0,
+            modes[8], 56, 24,
+            # modes[4], 55, 24,
+            # modes[5], 55, 48,
+
         #     modes[1], 60, 0, 
         #     modes[2], 60, 12,
         #     modes[3], 60, 24,
         #     modes[4], 60, 36,
         #     modes[5], 60, 48,
         #     modes[6], 60, 60
-        # )
+        )
 
         # == USE CASE 2. Dance to an input audio with automatic segmentations ==
         # /dance audio_filepath
-        osc_dance("/dance", song_list[10])
+        # osc_dance("/dance", song_list[10])
 
     except Exception as e:
         print(f"Caught exception: {e}")
