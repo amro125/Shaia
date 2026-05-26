@@ -17,7 +17,7 @@ from defs import (
     NUM_ARMS, OCTAVES_TO_TRY, SLIDER_LIMIT, DLY_S, STRIKE_TIME_S,
     BOUNDARIES, INITIAL_POSITION,
 )
-from utils import is_white_key, midi_to_position, SerialTransport
+from transport import is_white_key, midi_to_position, SerialTransport
 
 
 @dataclass
@@ -105,9 +105,11 @@ class StrikerScheduler:
         self._mode = mode
 
     def schedule(self, note: int, arm_id: int, midi_velocity: int, strike_time: float) -> None:
-        striker_bit = (arm_id * 2) + is_white_key(note)
+        # StrikersOther strikers are sequentially numbered after the sliders:
+        # arm 0 -> {black: 3, white: 4}, arm 1 -> {black: 5, white: 6}.
+        striker_id = (NUM_ARMS + 1) + (arm_id * 2) + is_white_key(note)
         self._q.put(StrikerCommand(
-            striker_id=1 << striker_bit,
+            striker_id=striker_id,
             midi_velocity=max(0, min(127, midi_velocity)),
             mode=self._mode,
             strike_time=strike_time,
@@ -138,7 +140,7 @@ class StrikerScheduler:
                 time.sleep(wait)
             self._transport.send_striker(cmd.striker_id, cmd.midi_velocity, cmd.mode)
             logging.info(
-                "strike id=0x%02x vel=%d mode=%s", cmd.striker_id, cmd.midi_velocity, cmd.mode,
+                "strike id=%d vel=%d mode=%s", cmd.striker_id, cmd.midi_velocity, cmd.mode,
             )
 
 

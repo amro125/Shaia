@@ -4,21 +4,48 @@ import os
 
 NUM_ARMS = 2
 OCTAVES_TO_TRY = (0, 1, -1)
-MIN_NOTE = 48
-MAX_NOTE = 95
-SLIDER_LIMIT = 1385
+MIN_NOTE = 53   # F3
+MAX_NOTE = 83   # B5
+SLIDER_LIMIT = 546   # mm: B5 at 516 mm + 30 mm clearance to arm 1 home
 DLY_S = 0.45
 STRIKE_TIME_S = 0.050
 
+# Lowest note F3 sits 6 mm from arm 0 home. White keys are spaced 30 mm apart
+# (18 whites: F3, G3, A3, B3, C4 ... B5, ending at 516 mm). Black keys sit at
+# the midpoint between their two adjacent whites. Indexed by (midi - MIN_NOTE).
 NOTE_POSITION_TABLE = (
-    0, 10, 44, 73, 102, 157, 184, 212, 240, 267, 294, 324, 377, 406, 434,
-    463, 490, 546, 574, 599, 624, 651, 673, 698, 749, 771, 798, 820, 846,
-    894, 919, 945, 969, 993, 1018, 1044, 1092, 1118, 1142, 1167, 1193, 1240,
-    1266, 1291, 1315, 1339, 1364, 1385, 1385,
+    6,  21,  36,  51,  66,  81,  96, 126, 141, 156,
+    171, 186, 216, 231, 246, 261, 276, 291, 306, 336,
+    351, 366, 381, 396, 426, 441, 456, 471, 486, 501,
+    516,
 )
 BOUNDARIES = ((0, 40), (40, 0))
 INITIAL_POSITION = (0, SLIDER_LIMIT)
 BLACK_KEY_PCS = frozenset({1, 3, 6, 8, 10})
+
+# --- StrikersOther wire format ----------------------------------------------
+# 11-byte little-endian frame on the shared serial port:
+#   [0]    0xAA      sync
+#   [1]    uint8     sliderID  (1/2 = slider move; 0xFE = home all; else = no slider)
+#   [2..5] int32     slider target ticks
+#   [6..7] int16     slider duration (1 ms ticks)
+#   [8]    uint8     strikerID (>=3 = strike; else ignored)
+#   [9]    uint8     velocity  (0-127)
+#   [10]   uint8     action    (0 = single hit, 1 = tremolo)
+FRAME_FMT = "<BBiHBBB"
+SLIDER_MOVE_DURATION_MS = 450
+
+# Slider encoder: 40 mm per full revolution, EC45_ENC_RES_SLIDER = 1024 ticks/rev.
+SLIDER_TICKS_PER_REV = 1024
+SLIDER_MM_PER_REV = 40
+MM_TO_TICKS = SLIDER_TICKS_PER_REV / SLIDER_MM_PER_REV
+
+# Per-arm transform from the shared rail mm coordinate (0..SLIDER_LIMIT) to each
+# arm's home-relative mm: arm_mm = SLIDER_W[id] * shared_mm + SLIDER_B[id].
+# Arm 0 homes at the lowest note (0 mm) and moves up with positive ticks.
+# Arm 1 homes at the highest note (SLIDER_LIMIT) and moves down with positive ticks.
+SLIDER_W = (1, -1)
+SLIDER_B = (0, SLIDER_LIMIT)
 
 DEFAULT_ARM_PORT = "/dev/tty.usbmodem1101"
 DEFAULT_ARM_BAUD = 115200

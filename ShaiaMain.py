@@ -20,7 +20,7 @@ from defs import (
     DEFAULT_DANCE_MODES_PATH, DEFAULT_BPM,
     ARM_OSC_ROUTE, HEAD_OSC_ROUTE, HEAD_STOP_OSC_ROUTE,
 )
-from utils import SerialTransport
+from transport import SerialTransport
 from arms import ArmController
 from head import HeadMotors, DummyHeadMotors, GestureRunner
 
