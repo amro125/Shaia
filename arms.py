@@ -193,6 +193,7 @@ class ArmController:
     """Bundles arms + striker + planner so ShaiaMain can manage them as one unit."""
 
     def __init__(self, transport: SerialTransport):
+        self._transport = transport
         self._arms = [Arm(i, INITIAL_POSITION[i], transport) for i in range(NUM_ARMS)]
         self._striker = StrikerScheduler(transport)
 
@@ -205,6 +206,9 @@ class ArmController:
         self._striker.stop()
         for arm in self._arms:
             arm.stop()
+
+    def home(self) -> None:
+        self._transport.send_home()
 
     def handle_note(self, note: int, velocity: int) -> None:
         if velocity == 0:

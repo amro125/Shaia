@@ -56,8 +56,13 @@ DEFAULT_OSC_HOST = "0.0.0.0"
 DEFAULT_OSC_PORT = 9000
 
 ARM_OSC_ROUTE = "/arm"
+ARM_HOME_OSC_ROUTE = "/arm_home"
 HEAD_OSC_ROUTE = "/head"
 HEAD_STOP_OSC_ROUTE = "/head_stop"
+
+# Home command for the ASCII strikers firmware: parseCommand requires
+# len(cmd) >= 4 and the trailing '\n' triggers stringComplete in serialEvent.
+HOME_FRAME = b"h\x00\x00\n"
 
 # normalized_position [0,1] is mapped to [min, max] in dynamixel-degree space.
 # Values lifted from Shaia/Dance/dance.py.
@@ -70,9 +75,7 @@ HEAD_MOTORS = {
 }
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DANCE_MODES_PATH = os.path.normpath(
-    os.path.join(_HERE, "..", "Shaia", "Dance", "danceModes.json")
-)
+DEFAULT_DANCE_MODES_PATH = os.path.join(_HERE, "Dance", "danceModes.json")
 
 GESTURE_TICK_S = 0.05
 GESTURE_TRIGGER_WINDOW_S = 0.07

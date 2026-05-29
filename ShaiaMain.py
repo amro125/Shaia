@@ -2,6 +2,7 @@
 
 OSC routes:
   /arm <note> <velocity>          MIDI-style note trigger (vel=0 is dropped)
+  /arm_home                       Send the slider homing command to the MCU
   /head <gesture> [bpm]           Start a gesture loop (replaces any current one)
   /head_stop                      Stop the current gesture
 """
@@ -18,7 +19,7 @@ from defs import (
     DEFAULT_HEAD_PORT, DEFAULT_HEAD_BAUD,
     DEFAULT_OSC_HOST, DEFAULT_OSC_PORT,
     DEFAULT_DANCE_MODES_PATH, DEFAULT_BPM,
-    ARM_OSC_ROUTE, HEAD_OSC_ROUTE, HEAD_STOP_OSC_ROUTE,
+    ARM_OSC_ROUTE, ARM_HOME_OSC_ROUTE, HEAD_OSC_ROUTE, HEAD_STOP_OSC_ROUTE,
 )
 from transport import SerialTransport
 from arms import ArmController
@@ -57,6 +58,10 @@ def main() -> int:
             return
         arms.handle_note(int(osc_args[0]), int(osc_args[1]))
 
+    def on_arm_home(_addr, *_osc_args):
+        logging.info("Homing sliders")
+        arms.home()
+
     def on_head(_addr, *osc_args):
         if len(osc_args) < 1:
             logging.warning("Ignoring /head with 0 args")
@@ -70,6 +75,7 @@ def main() -> int:
 
     dispatcher = Dispatcher()
     dispatcher.map(ARM_OSC_ROUTE, on_arm)
+    dispatcher.map(ARM_HOME_OSC_ROUTE, on_arm_home)
     dispatcher.map(HEAD_OSC_ROUTE, on_head)
     dispatcher.map(HEAD_STOP_OSC_ROUTE, on_head_stop)
 
